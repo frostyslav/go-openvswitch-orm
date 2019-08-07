@@ -2,6 +2,8 @@ package parser
 
 import (
 	"fmt"
+	"github.com/frostyslav/gopenvswitch-db/app/xmlschema"
+	"math"
 	"strings"
 )
 
@@ -32,6 +34,7 @@ type columnType struct {
 	keyRawData    interface{}
 	valueRawData  interface{}
 	rawData       interface{}
+	xmlDoc        *xmlschema.Database
 }
 
 type keyOfType struct {
@@ -162,23 +165,19 @@ func (ct *columnType) parseGenericCompound(t string, data map[string]interface{}
 				}
 			}
 
-			customTypeName := fmt.Sprintf("%s%s", ct.tableName, ct.columnName)
-			createCustomStringType(customTypeName, values...)
+			customTypeName := ct.createCustomStringType(values)
 			return customTypeName
 		}
 
-		return fmt.Sprintf("string // (parse MAXLENGTH)")
+		return "string // (parse MAXLENGTH)"
 	case intType:
 		minVal := minIntegerValue(data)
 		maxVal := maxIntegerValue(data)
-		if minVal >= 0 && maxVal > 0 {
-			return fmt.Sprintf("IntMin%dMax%d", minVal, maxVal)
-		} else if minVal >= 0 {
-			return fmt.Sprintf("IntMin%d", minVal)
-		} else if maxVal > 0 {
-			return fmt.Sprintf("IntMax%d", minVal)
+		if minVal > 0 || maxVal > 0 {
+			customTypeName := ct.createCustomIntType(minVal, maxVal)
+			return customTypeName
 		} else {
-			return fmt.Sprintf("int")
+			return "int"
 		}
 	case uuidType:
 		refTable := sanitizeName(data[refTableKey].(string))
@@ -188,28 +187,68 @@ func (ct *columnType) parseGenericCompound(t string, data map[string]interface{}
 	}
 }
 
-func createCustomIntType(name string) string {
-	var str strings.Builder
+func (ct *columnType) createCustomIntType(min, max int64) string {
+	var customTypeName string
+	intSize := "int"
+	if min > 0 && max > 0 {
+		intSize = intSizeFromMaxValue(max)
+		customTypeName = fmt.Sprintf("IntFrom%dTo%d", min, max)
+	} else if min > 0 {
+		intSize = "int64"
+		customTypeName = fmt.Sprintf("IntFrom%d", min)
+	} else if max > 0 {
+		intSize = intSizeFromMaxValue(max)
+		customTypeName = fmt.Sprintf("IntFrom0To%d", max)
+	}
 
-	str.WriteString(fmt.Sprintf("type %s int64", name))
+	if _, ok := customTypes[customTypeName]; !ok {
+		var str strings.Builder
 
-	return str.String()
+		str.WriteString(fmt.Sprintf("// %s custom integer type of %s size.\n", customTypeName, intSize))
+		str.WriteString(fmt.Sprintf("type %s %s\n", customTypeName, intSize))
+
+		customTypes[customTypeName] = str.String()
+	}
+
+	return customTypeName
 }
 
-func createCustomStringType(name string, values ...string) {
+func intSizeFromMaxValue(val int64) string {
+	if val < math.MaxInt8 {
+		return "int8"
+	} else if val < math.MaxInt16 {
+		return "int16"
+	} else if val < math.MaxInt32 {
+		return "int32"
+	} else if val < math.MaxInt64 {
+		return "int64"
+	} else {
+		return "int"
+	}
+}
+
+func (ct *columnType) createCustomStringType(values []string) string {
 	var str strings.Builder
 
-	sanitizedName := sanitizeName(name)
+	customTypeName := fmt.Sprintf("%s%s", sanitizeName(ct.tableName), sanitizeName(ct.columnName))
 	if len(values) > 0 {
 		str.WriteString("const (\n")
 		for _, val := range values {
 			sanitizedValue := sanitizeName(val)
-			str.WriteString(fmt.Sprintf("%s %s = 	%q\n", sanitizedValue, sanitizedName, val))
+			keyName := fmt.Sprintf("%s%s", customTypeName, sanitizedValue)
+			str.WriteString(ct.addKeyComment(keyName, val))
+			str.WriteString(fmt.Sprintf("%s %s = %q\n", keyName, customTypeName, val))
 		}
 		str.WriteString(")\n")
 	}
 
-	str.WriteString(fmt.Sprintf("type %s string\n", name))
+	str.WriteString(fmt.Sprintf("type %s string\n", customTypeName))
 
-	customTypes[name] = str.String()
+	customTypes[customTypeName] = str.String()
+
+	return customTypeName
+}
+
+func (ct *columnType) addKeyComment(keyName, rawKeyName string) string {
+	return fmt.Sprintf("// %s %s\n", keyName, ct.xmlDoc.KeyDescription(ct.tableName, ct.columnName, rawKeyName))
 }

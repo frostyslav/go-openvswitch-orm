@@ -43,8 +43,9 @@ var (
 )
 
 type parser struct {
-	DBSchema map[string]interface{}
-	XMLDoc   *xmlschema.Database
+	DBSchema  map[string]interface{}
+	XMLDoc    *xmlschema.Database
+	RawXMLDoc *xmlschema.Database
 }
 
 func New(jsonSchemaFile, xmlDocFile string) (*parser, error) {
@@ -64,7 +65,12 @@ func New(jsonSchemaFile, xmlDocFile string) (*parser, error) {
 		return nil, fmt.Errorf("new xml: %v", err)
 	}
 
-	return &parser{DBSchema: dbSchema, XMLDoc: xmlDoc}, nil
+	rawXMLDoc, err := xmlschema.NewXML("files/ovn-nb-with-keys.xml")
+	if err != nil {
+		return nil, fmt.Errorf("new xml: %v", err)
+	}
+
+	return &parser{DBSchema: dbSchema, XMLDoc: xmlDoc, RawXMLDoc: rawXMLDoc}, nil
 }
 
 func (p *parser) Parse() (map[string]string, map[string]string) {
@@ -96,7 +102,7 @@ func (p *parser) Parse() (map[string]string, map[string]string) {
 			str.WriteString(p.addColumnComment(rawTableName, rawColumnName))
 			str.WriteString(fmt.Sprintf("%s ", columnName))
 
-			col := column{tableName: tableName, name: columnName, rawName: rawColumnName, rawData: data}
+			col := column{tableName: rawTableName, name: rawColumnName, rawData: data, xmlDoc: p.RawXMLDoc}
 			str.WriteString(fmt.Sprintf("%s", col.parse()))
 		}
 		str.WriteString("}\n")
