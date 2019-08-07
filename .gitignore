@@ -1,0 +1,8 @@
+# Goland
+.idea/*
+
+files/*.json
+files/*.xml
+output/*.go
+
+*.out
