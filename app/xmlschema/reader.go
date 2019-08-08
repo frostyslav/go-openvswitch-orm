@@ -7,8 +7,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-
-	"github.com/eidolon/wordwrap"
 )
 
 func NewXML(filePath string) (*Database, error) {
@@ -44,11 +42,11 @@ func (d *Database) TableDescription(tableName string) string {
 			text = fmt.Sprintf("%s%s", text, t.Text)
 			for _, g := range t.Group {
 				for _, p := range g.P {
-					text = fmt.Sprintf("%s%s", text, p.Text)
+					text = fmt.Sprintf("%s%s", text, p)
 				}
 			}
 			for _, p := range t.P {
-				text = fmt.Sprintf("%s%s", text, p.Text)
+				text = fmt.Sprintf("%s%s", text, p)
 			}
 		}
 	}
@@ -56,9 +54,6 @@ func (d *Database) TableDescription(tableName string) string {
 	text = strings.TrimSpace(text)
 	space := regexp.MustCompile(`\s+`)
 	text = space.ReplaceAllString(text, " ")
-	wrapper := wordwrap.Wrapper(77, false)
-	text = wrapper(text)
-	text = strings.Replace(text, "\n", "\n// ", -1)
 
 	return text
 }
@@ -82,7 +77,7 @@ func (d *Database) ColumnDescription(tableName, columnName string) string {
 					}
 					for _, p := range c.P {
 						if c.Name == columnName {
-							text = fmt.Sprintf("%s%s", text, p.Text)
+							text = fmt.Sprintf("%s%s", text, p)
 						}
 					}
 				}
@@ -93,10 +88,30 @@ func (d *Database) ColumnDescription(tableName, columnName string) string {
 	text = strings.TrimSpace(text)
 	space := regexp.MustCompile(`\s+`)
 	text = space.ReplaceAllString(text, " ")
-	wrapper := wordwrap.Wrapper(77, false)
-	text = wrapper(text)
-	text = strings.Replace(text, "\n", "\n// ", -1)
 
 	return text
 }
 
+func (d *Database) KeyDescription(tableName, columnName, keyName string) string {
+	var text string
+	for _, t := range d.Table {
+		if t.Name == tableName {
+			for _, c := range t.Column {
+				if c.Name == columnName {
+					for _, l := range c.Ul.Li {
+						if l.Key == keyName {
+							text = fmt.Sprintf("%s%s", text, l.Text)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	text = strings.TrimSpace(text)
+	text = strings.ReplaceAll(text, ": ", " ")
+	space := regexp.MustCompile(`\s+`)
+	text = space.ReplaceAllString(text, " ")
+
+	return text
+}

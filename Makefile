@@ -17,19 +17,25 @@ download-description: ## download ovn description
 	curl -s -L https://raw.githubusercontent.com/openvswitch/ovs/master/ovn/ovn-nb.xml -o files/ovn-nb.xml
 
 sanitize-xml: ## sanitize xml
-	sed -i 's%<code>%"%g' files/ovn-nb.xml
-	sed -i 's%</code>%"%g' files/ovn-nb.xml
+	tr -d "\n\r" < files/ovn-nb.xml > files/temp.xml
+	xmllint --format files/temp.xml > files/ovn-nb.xml
 	sed -i 's%<var>%"%g' files/ovn-nb.xml
 	sed -i 's%</var>%"%g' files/ovn-nb.xml
 	sed -i 's%<em>%"%g' files/ovn-nb.xml
 	sed -i 's%</em>%"%g' files/ovn-nb.xml
 	sed -i 's/<ref\(.*\)=\(.*\)\/>/\2/g' files/ovn-nb.xml
+	cp files/ovn-nb.xml files/ovn-nb-with-keys.xml
+	sed -i 's%<code>\([0-9a-z-]*\)</code>:%<key>\1</key>:%g' files/ovn-nb-with-keys.xml
+	sed -i 's%<code>%"%g' files/ovn-nb.xml
+	sed -i 's%</code>%"%g' files/ovn-nb.xml
+	sed -i 's%<code>%"%g' files/ovn-nb-with-keys.xml
+	sed -i 's%</code>%"%g' files/ovn-nb-with-keys.xml
 
 generate-xml-struct: sanitize-xml ## generate go struct from xml file
-	echo "package xmlschema" > app/xmlschema/xml-schema.go
-	echo 'import "encoding/xml"' >> app/xmlschema/xml-schema.go
-	zek -e files/ovn-nb.xml >> app/xmlschema/xml-schema.go
-	gofmt -w app/xmlschema/xml-schema.go
+	echo "package xmlschema" > app/xmlschema/xmlschema.go
+	echo 'import "encoding/xml"' >> app/xmlschema/xmlschema.go
+	zek -e files/ovn-nb-with-keys.xml >> app/xmlschema/xmlschema.go
+	gofmt -w app/xmlschema/xmlschema.go
 
 install-prerequisites: ## installs required binaries
 	go get -v github.com/miku/zek/cmd/...

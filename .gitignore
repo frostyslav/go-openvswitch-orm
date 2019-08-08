@@ -4,5 +4,6 @@
 files/*.json
 files/*.xml
 output/*.go
+app/xmlschema/xmlschema.go
 
 *.out

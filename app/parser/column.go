@@ -2,7 +2,6 @@ package parser
 
 import (
 	"fmt"
-
 	log "github.com/sirupsen/logrus"
 )
 
@@ -11,23 +10,15 @@ const (
 	typeKey string = "type"
 )
 
-type column struct {
-	tableName string
-	name      string
-	rawName   string
-	rawData   interface{}
-}
-
-func (c *column) parse() string {
-	column, ok := c.rawData.(map[string]interface{})
+func (p *parser) parseColumn(i *info, data interface{}) string {
+	column, ok := data.(map[string]interface{})
 	if !ok {
-		log.Warnf("Can't parse column %q", c.rawName)
+		log.Warnf("Can't parse column %q", i.dbColumnName)
 		return ""
 	}
 
-	if t, ok := column[typeKey]; ok {
-		colType := &columnType{rawData: t, columnName: c.name, tableName: c.tableName}
-		return fmt.Sprintf("%s\n", colType.parse())
+	if typeData, ok := column[typeKey]; ok {
+		return fmt.Sprintf("%s\n", p.parseColumnType(i, typeData))
 	}
 
 	return ""

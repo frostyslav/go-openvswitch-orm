@@ -33,34 +33,16 @@ func main() {
 		return
 	}
 
-	tables, customTypes := p.Parse()
+	p.Parse()
 
-	var formattedOutput strings.Builder
-	formattedOutput.WriteString("package ovnnb\n")
+	var str strings.Builder
+	str.WriteString("package ovnnb\n")
+	str.WriteString(sortedMapOutput(p.CustomTypes()))
+	str.WriteString(sortedMapOutput(p.Structures()))
 
-	var customTypeKeys []string
-	for k := range customTypes {
-		customTypeKeys = append(customTypeKeys, k)
-	}
-	sort.Strings(customTypeKeys)
-
-	for _, k := range customTypeKeys {
-		formattedOutput.WriteString(customTypes[k])
-	}
-
-	var keys []string
-	for k := range tables {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	for _, k := range keys {
-		formattedOutput.WriteString(tables[k])
-	}
-
-	output, err := format.Source([]byte(formattedOutput.String()))
+	gofmted, err := format.Source([]byte(str.String()))
 	if err != nil {
-		log.Errorf("format output: %v", err)
+		log.Errorf("run go fmt: %v", err)
 		return
 	}
 
@@ -72,5 +54,20 @@ func main() {
 
 	defer file.Close()
 
-	file.Write(output)
+	file.Write(gofmted)
+}
+
+func sortedMapOutput(m map[string]string) string {
+	var keys []string
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var s strings.Builder
+	for _, k := range keys {
+		s.WriteString(m[k])
+	}
+
+	return s.String()
 }
