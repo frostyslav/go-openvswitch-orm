@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -18,7 +17,7 @@ func (p *parser) parseColumn(i *info, data interface{}) string {
 	}
 
 	if typeData, ok := column[typeKey]; ok {
-		return fmt.Sprintf("%s\n", p.parseColumnType(i, typeData))
+		return p.parseColumnType(i, typeData) + "\n"
 	}
 
 	return ""

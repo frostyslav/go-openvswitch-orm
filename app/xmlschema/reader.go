@@ -39,14 +39,14 @@ func (d *Database) TableDescription(tableName string) string {
 
 	for _, t := range d.Table {
 		if t.Name == tableName {
-			text = fmt.Sprintf("%s%s", text, t.Text)
+			text = text + t.Text
 			for _, g := range t.Group {
 				for _, p := range g.P {
-					text = fmt.Sprintf("%s%s", text, p)
+					text = text + p
 				}
 			}
 			for _, p := range t.P {
-				text = fmt.Sprintf("%s%s", text, p)
+				text = text + p
 			}
 		}
 	}
@@ -64,20 +64,20 @@ func (d *Database) ColumnDescription(tableName, columnName string) string {
 		if t.Name == tableName {
 			for _, c := range t.Column {
 				if c.Name == columnName {
-					text = fmt.Sprintf("%s%s", text, c.Text)
+					text = text + c.Text
 					for _, p := range c.P {
-						text = fmt.Sprintf("%s%s", text, p.Text)
+						text = text + p.Text
 					}
 				}
 			}
 			for _, g := range t.Group {
 				for _, c := range g.Column {
 					if c.Name == columnName {
-						text = fmt.Sprintf("%s%s", text, c.Text)
+						text = text + c.Text
 					}
 					for _, p := range c.P {
 						if c.Name == columnName {
-							text = fmt.Sprintf("%s%s", text, p)
+							text = text + p
 						}
 					}
 				}
@@ -100,7 +100,7 @@ func (d *Database) KeyDescription(tableName, columnName, keyName string) string 
 				if c.Name == columnName {
 					for _, l := range c.Ul.Li {
 						if l.Key == keyName {
-							text = fmt.Sprintf("%s%s", text, l.Text)
+							text = text + l.Text
 						}
 					}
 				}

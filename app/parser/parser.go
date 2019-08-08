@@ -3,12 +3,13 @@ package parser
 import (
 	"encoding/json"
 	"fmt"
+	"go/types"
 	"io/ioutil"
-	"math"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/frostyslav/gopenvswitch-db/app/sanitize"
 	"github.com/frostyslav/gopenvswitch-db/app/xmlschema"
 )
 
@@ -32,18 +33,18 @@ const (
 
 var (
 	typeMatching = map[string]string{
-		stringType: "string",
-		intType:    "int",
-		boolType:   "bool",
+		stringType: types.Typ[types.String].String(),
+		intType:    types.Typ[types.Int].String(),
+		boolType:   types.Typ[types.Bool].String(),
 	}
 )
 
 type parser struct {
-	DBSchema    map[string]interface{}
-	XMLDoc      *xmlschema.Database
-	RawXMLDoc   *xmlschema.Database
-	structures  map[string]string
-	customTypes map[string]string
+	DBSchema       map[string]interface{}
+	XMLDoc         *xmlschema.Database
+	ModifiedXMLDoc *xmlschema.Database
+	structures     map[string]string
+	customTypes    map[string]string
 }
 
 type info struct {
@@ -70,12 +71,12 @@ func New(jsonSchemaFile, xmlDocFile string) (*parser, error) {
 		return nil, fmt.Errorf("new xml: %v", err)
 	}
 
-	rawXMLDoc, err := xmlschema.NewXML("files/ovn-nb-with-keys.xml")
+	modifiedXMLDoc, err := xmlschema.NewXML("files/ovn-nb-with-keys.xml")
 	if err != nil {
 		return nil, fmt.Errorf("new xml: %v", err)
 	}
 
-	return &parser{DBSchema: dbSchema, XMLDoc: xmlDoc, RawXMLDoc: rawXMLDoc}, nil
+	return &parser{DBSchema: dbSchema, XMLDoc: xmlDoc, ModifiedXMLDoc: modifiedXMLDoc}, nil
 }
 
 func (p *parser) Parse() {
@@ -86,11 +87,11 @@ func (p *parser) Parse() {
 
 	for rawTableName, data := range rawTables {
 		i.dbTableName = rawTableName
-		i.structName = sanitizeName(i.dbTableName)
+		i.structName = sanitize.Name(i.dbTableName)
 		var str strings.Builder
 
-		str.WriteString(p.addStructComment(i))
-		str.WriteString(fmt.Sprintf("type %s struct {\n", i.structName))
+		str.WriteString(p.structComment(i))
+		str.WriteString("type " + i.structName + " struct {\n")
 
 		table, ok := data.(map[string]interface{})
 		if !ok {
@@ -106,10 +107,9 @@ func (p *parser) Parse() {
 
 		for rawColumnName, data := range columns {
 			i.dbColumnName = rawColumnName
-			i.fieldName = sanitizeName(i.dbColumnName)
-			str.WriteString(p.addFieldComment(i))
-			str.WriteString(fmt.Sprintf("%s ", i.fieldName))
-			str.WriteString(fmt.Sprintf("%s", p.parseColumn(i, data)))
+			i.fieldName = sanitize.Name(i.dbColumnName)
+			str.WriteString(p.fieldComment(i))
+			str.WriteString(i.fieldName + " " + p.parseColumn(i, data))
 		}
 		str.WriteString("}\n")
 		p.structures[i.structName] = str.String()
@@ -122,67 +122,4 @@ func (p *parser) Structures() map[string]string {
 
 func (p *parser) CustomTypes() map[string]string {
 	return p.customTypes
-}
-
-func minValue(data map[string]interface{}) int64 {
-	if min, ok := data[minKey]; ok {
-		val, ok := min.(float64)
-		if !ok {
-			return 0
-		}
-		return int64(val)
-	}
-
-	return 0
-}
-
-func maxValue(data map[string]interface{}) int64 {
-	if max, ok := data[maxKey]; ok {
-		if max == "unlimited" {
-			return math.MaxInt64
-		}
-		val, ok := max.(float64)
-		if ok {
-			return int64(val)
-		}
-	}
-
-	return 0
-}
-
-func minIntegerValue(data map[string]interface{}) int64 {
-	if min, ok := data[minIntegerKey]; ok {
-		val, ok := min.(float64)
-		if !ok {
-			return -1
-		}
-		return int64(val)
-	}
-
-	return -1
-}
-
-func maxIntegerValue(data map[string]interface{}) int64 {
-	if max, ok := data[maxIntegerKey]; ok {
-		val, ok := max.(float64)
-		if ok {
-			return int64(val)
-		}
-	}
-
-	return 0
-}
-
-func sanitizeName(name string) string {
-	splittedName := strings.FieldsFunc(name, split)
-	var sanitizedName string
-	for _, splitted := range splittedName {
-		sanitizedName = fmt.Sprintf("%s%s", sanitizedName, strings.Title(splitted))
-	}
-
-	return strings.TrimSpace(sanitizedName)
-}
-
-func split(r rune) bool {
-	return r == '-' || r == '_'
 }

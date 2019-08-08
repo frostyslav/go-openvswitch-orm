@@ -2,15 +2,18 @@ package parser
 
 import (
 	"fmt"
+	"go/types"
 	"math"
 	"strings"
+
+	"github.com/frostyslav/gopenvswitch-db/app/sanitize"
 )
 
 func (p *parser) createNamedStringType(name, comment string) string {
 	var str strings.Builder
 
-	str.WriteString(p.addComment(fmt.Sprintf("%s %s\n", name, comment)))
-	str.WriteString(fmt.Sprintf("type %s string\n", name))
+	str.WriteString(p.customComment(name + " " + comment))
+	str.WriteString(p.typeDeclaration(name, types.Typ[types.String].String()))
 
 	p.customTypes[name] = str.String()
 
@@ -20,35 +23,35 @@ func (p *parser) createNamedStringType(name, comment string) string {
 func (p *parser) createAcceptableValuesStringType(i *info, values []string) string {
 	var str strings.Builder
 
-	customTypeName := fmt.Sprintf("%s%s", i.structName, i.fieldName)
+	typeName := i.structName + i.fieldName
 	if len(values) > 0 {
 		str.WriteString("const (\n")
-		for _, val := range values {
-			sanitizedDbKeyValue := sanitizeName(val)
-			variableName := fmt.Sprintf("%s%s", customTypeName, sanitizedDbKeyValue)
-			str.WriteString(p.addVariableComment(i, variableName, val))
-			str.WriteString(fmt.Sprintf("%s %s = %q\n", variableName, customTypeName, val))
+		for _, v := range values {
+			val := sanitize.Name(v)
+			varName := typeName + val
+			str.WriteString(p.variableComment(i, varName, v))
+			str.WriteString(p.variableDeclaration(varName, typeName, v))
 		}
 		str.WriteString(")\n")
 	}
 
-	comment := fmt.Sprintf("%s contains acceptable values for %q column of %q table.\n", customTypeName, i.dbColumnName, i.dbTableName)
-	str.WriteString(p.addComment(comment))
-	str.WriteString(fmt.Sprintf("type %s string\n", customTypeName))
+	comment := typeName + " contains acceptable values for '" + i.dbColumnName + "' column of '" + i.dbTableName + "' table."
+	str.WriteString(p.customComment(comment))
+	str.WriteString(p.typeDeclaration(typeName, types.Typ[types.String].String()))
 
-	p.customTypes[customTypeName] = str.String()
+	p.customTypes[typeName] = str.String()
 
-	return customTypeName
+	return typeName
 }
 
 func (p *parser) createCustomIntType(min, max int64) string {
 	var customTypeName string
-	intSize := "int"
+	intSize := types.Typ[types.Int].String()
 	if min > 0 && max > 0 {
 		intSize = p.intSizeFromMaxValue(max)
 		customTypeName = fmt.Sprintf("IntFrom%dTo%d", min, max)
 	} else if min > 0 {
-		intSize = "int64"
+		intSize = types.Typ[types.Int64].String()
 		customTypeName = fmt.Sprintf("IntFrom%d", min)
 	} else if max > 0 {
 		intSize = p.intSizeFromMaxValue(max)
@@ -58,8 +61,8 @@ func (p *parser) createCustomIntType(min, max int64) string {
 	if _, ok := p.customTypes[customTypeName]; !ok {
 		var str strings.Builder
 
-		str.WriteString(fmt.Sprintf("// %s custom integer type of %s size.\n", customTypeName, intSize))
-		str.WriteString(fmt.Sprintf("type %s %s\n", customTypeName, intSize))
+		str.WriteString(p.customComment(customTypeName + " custom integer type of " + intSize + " size."))
+		str.WriteString(p.typeDeclaration(customTypeName, intSize))
 
 		p.customTypes[customTypeName] = str.String()
 	}
@@ -69,14 +72,22 @@ func (p *parser) createCustomIntType(min, max int64) string {
 
 func (p *parser) intSizeFromMaxValue(val int64) string {
 	if val < math.MaxInt8 {
-		return "int8"
+		return types.Typ[types.Int8].String()
 	} else if val < math.MaxInt16 {
-		return "int16"
+		return types.Typ[types.Int16].String()
 	} else if val < math.MaxInt32 {
-		return "int32"
+		return types.Typ[types.Int32].String()
 	} else if val < math.MaxInt64 {
-		return "int64"
+		return types.Typ[types.Int64].String()
 	} else {
-		return "int"
+		return types.Typ[types.Int].String()
 	}
+}
+
+func (p *parser) typeDeclaration(name, typ string) string {
+	return "type " + name + " " + typ + "\n"
+}
+
+func (p *parser) variableDeclaration(name, typ, val string) string {
+	return name + " " + typ + " = \"" + val + "\"\n"
 }
