@@ -39,4 +39,3 @@ generate-xml-struct: sanitize-xml ## generate go struct from xml file
 
 install-prerequisites: ## installs required binaries
 	go get -v github.com/miku/zek/cmd/...
-	go get github.com/eidolon/wordwrap
