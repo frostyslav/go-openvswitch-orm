@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"go/format"
 	"os"
 	"sort"
@@ -15,13 +16,13 @@ import (
 const (
 	defaultJSONSchemaLocation string = "files/ovn-nb.json"
 	defaultXMLDocLocation     string = "files/ovn-nb.xml"
-	defaultOutputLocation     string = "output/generated.go"
+	defaultOutputLocation     string = "output"
 )
 
 var (
 	jsonSchemaFile = flag.String("json-schema", defaultJSONSchemaLocation, "json schema location")
 	xmlDocFile     = flag.String("xml-doc", defaultXMLDocLocation, "xml doc location")
-	outputFile     = flag.String("output", defaultOutputLocation, "output location")
+	outputLocation = flag.String("output", defaultOutputLocation, "output location")
 )
 
 func main() {
@@ -35,29 +36,46 @@ func main() {
 
 	p.Parse()
 
-	var str strings.Builder
-	str.WriteString("package ovnnb\n")
-	str.WriteString(sortedMapOutput(p.CustomTypes()))
-	str.WriteString(sortedMapOutput(p.Structures()))
-
-	gofmted, err := format.Source([]byte(str.String()))
+	err = writeGeneratedCodeToFile("ovnnb", *outputLocation + "/types.go", mapToString(p.CustomTypes()))
 	if err != nil {
-		log.Errorf("run go fmt: %v", err)
+		log.Errorf(err.Error())
 		return
 	}
 
-	file, err := os.Create(*outputFile)
+	err = writeGeneratedCodeToFile("ovnnb", *outputLocation + "/structs.go", mapToString(p.Structures()))
 	if err != nil {
-		log.Errorf("create file: %v", err)
+		log.Errorf(err.Error())
 		return
+	}
+}
+
+func writeGeneratedCodeToFile(packageName, fileName, contents string) error {
+	var str strings.Builder
+
+	str.WriteString("package " + packageName + "\n")
+	str.WriteString(contents)
+
+	gofmted, err := format.Source([]byte(str.String()))
+	if err != nil {
+		return fmt.Errorf("run go fmt: %v", err)
+	}
+
+	file, err := os.Create(fileName)
+	if err != nil {
+		return fmt.Errorf("create file: %v", err)
 	}
 
 	defer file.Close()
 
-	file.Write(gofmted)
+	_, err = file.Write(gofmted)
+	if err != nil {
+		return fmt.Errorf("write to file: %v", err)
+	}
+
+	return nil
 }
 
-func sortedMapOutput(m map[string]string) string {
+func mapToString(m map[string]string) string {
 	var keys []string
 	for k := range m {
 		keys = append(keys, k)

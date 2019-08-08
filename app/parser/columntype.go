@@ -2,6 +2,9 @@ package parser
 
 import (
 	"fmt"
+	"go/types"
+
+	"github.com/frostyslav/gopenvswitch-db/app/sanitize"
 )
 
 // type keys
@@ -25,20 +28,20 @@ const (
 func (p *parser) parseColumnType(i *info, data interface{}) string {
 	switch d := data.(type) {
 	case map[string]interface{}:
-		return fmt.Sprintf("%s", p.parseCompoundType(i, d))
+		return p.parseCompoundType(i, d)
 	default:
-		return fmt.Sprintf("%s", p.parseSimpleType(d))
+		return p.parseSimpleType(d)
 	}
 }
 
 func (p *parser) parseSimpleType(data interface{}) string {
 	switch keyType := data.(type) {
 	case string:
-		return fmt.Sprintf(typeMatching[keyType])
+		return typeMatching[keyType]
 	case int:
-		return fmt.Sprintf("int")
+		return types.Typ[types.Int].String()
 	case bool:
-		return fmt.Sprintf("bool")
+		return types.Typ[types.Bool].String()
 	}
 	return ""
 }
@@ -57,33 +60,33 @@ func (p *parser) parseCompoundType(i *info, data map[string]interface{}) string 
 		containsMaxKey = true
 	}
 
-	var firstType, lastType string
+	var key, value string
 	if containsKey {
 		switch d := data[keyKey].(type) {
 		case map[string]interface{}:
-			lastType = p.parseKeyValueCompound(i, d)
+			value = p.parseKeyValueCompound(i, d)
 		default:
-			lastType = p.parseSimpleType(d)
+			value = p.parseSimpleType(d)
 		}
 
 		if containsValue {
 			switch d := data[valueKey].(type) {
 			case map[string]interface{}:
-				firstType = p.parseKeyValueCompound(i, d)
+				key = p.parseKeyValueCompound(i, d)
 			default:
-				firstType = p.parseSimpleType(d)
+				key = p.parseSimpleType(d)
 			}
 
-			return fmt.Sprintf("map[%s]%s", firstType, lastType)
+			return "map[" + key + "]" + value
 		}
 
 		if containsMaxKey {
 			if maxValue(data) > 1 {
-				return fmt.Sprintf("[]%s", lastType)
+				return "[]" + value
 			}
 		}
 
-		return lastType
+		return value
 	}
 
 	return ""
@@ -94,40 +97,28 @@ func (p *parser) parseKeyValueCompound(i *info, data map[string]interface{}) str
 		switch v {
 		case stringType:
 			if enum, ok := data[enumKey]; ok {
-				var values []string
-				e, ok := enum.([]interface{})
-				if ok {
-					if len(e) == 2 {
-						if eValues, ok := e[1].([]interface{}); ok {
-							for _, v := range eValues {
-								values = append(values, v.(string))
-							}
-						}
-					}
-				}
-
+				values := enumValues(enum)
 				return p.createAcceptableValuesStringType(i, values)
 			}
 
-			if maxLength, ok := data[maxLengthKey]; ok {
-				if val, ok := maxLength.(float64); ok {
-					return p.createNamedStringType(fmt.Sprintf("StringOf%dSymbols", int(val)), fmt.Sprintf("is a string with a maximum length of %d symbols.", int(val)))
-				}
+			if _, ok := data[maxLengthKey]; ok {
+				val := maxLengthValue(data)
+				return p.createNamedStringType(fmt.Sprintf("StringOf%dSymbols", val), fmt.Sprintf("is a string with a maximum length of %d symbols.", val))
 			}
-			return "string"
+			return types.Typ[types.String].String()
 		case intType:
 			minVal := minIntegerValue(data)
 			maxVal := maxIntegerValue(data)
 			if minVal > 0 || maxVal > 0 {
 				return p.createCustomIntType(minVal, maxVal)
 			} else {
-				return "int"
+				return types.Typ[types.Int].String()
 			}
 		case uuidType:
-			refTable := sanitizeName(data[refTableKey].(string))
-			return fmt.Sprintf("*%s", refTable)
+			refTable := sanitize.Name(data[refTableKey].(string))
+			return "*" + refTable
 		default:
-			return fmt.Sprintf(v)
+			return v
 		}
 	}
 

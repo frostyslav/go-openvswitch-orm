@@ -1,21 +1,21 @@
 package wrapper
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/eidolon/wordwrap"
 )
 
-func Wrap(s string) string {
-	wrapper := wordwrap.Wrapper(77, false)
+func Wrap(s string, limit int) string {
+	wrapper := wordwrap.Wrapper(limit, false)
 	return wrapper(s)
 }
 
-func WrapAsComment(s string) string {
-	s = fmt.Sprintf("// %s", s)
-	s = Wrap(s)
+func WrapAsComment(s string, limit int) string {
+	limit = limit - 3 // we need to account for added comment symbols
+	s = "// " + s
+	s = Wrap(s, limit)
 	s = strings.Replace(s, "\n", "\n// ", -1)
 
-	return fmt.Sprintf("%s\n", s)
+	return s + "\n"
 }
