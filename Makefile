@@ -32,10 +32,10 @@ sanitize-xml: ## sanitize xml
 	sed -i 's%</code>%"%g' files/ovn-nb-with-keys.xml
 
 generate-xml-struct: sanitize-xml ## generate go struct from xml file
-	echo "package xmlschema" > app/xmlschema/xml-schema.go
-	echo 'import "encoding/xml"' >> app/xmlschema/xml-schema.go
-	zek -e files/ovn-nb-with-keys.xml >> app/xmlschema/xml-schema.go
-	gofmt -w app/xmlschema/xml-schema.go
+	echo "package xmlschema" > app/xmlschema/xmlschema.go
+	echo 'import "encoding/xml"' >> app/xmlschema/xmlschema.go
+	zek -e files/ovn-nb-with-keys.xml >> app/xmlschema/xmlschema.go
+	gofmt -w app/xmlschema/xmlschema.go
 
 install-prerequisites: ## installs required binaries
 	go get -v github.com/miku/zek/cmd/...
