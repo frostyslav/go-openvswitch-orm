@@ -7,8 +7,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-
-	"github.com/eidolon/wordwrap"
 )
 
 func NewXML(filePath string) (*Database, error) {
@@ -56,9 +54,6 @@ func (d *Database) TableDescription(tableName string) string {
 	text = strings.TrimSpace(text)
 	space := regexp.MustCompile(`\s+`)
 	text = space.ReplaceAllString(text, " ")
-	wrapper := wordwrap.Wrapper(77, false)
-	text = wrapper(text)
-	text = strings.Replace(text, "\n", "\n// ", -1)
 
 	return text
 }
@@ -93,9 +88,6 @@ func (d *Database) ColumnDescription(tableName, columnName string) string {
 	text = strings.TrimSpace(text)
 	space := regexp.MustCompile(`\s+`)
 	text = space.ReplaceAllString(text, " ")
-	wrapper := wordwrap.Wrapper(77, false)
-	text = wrapper(text)
-	text = strings.Replace(text, "\n", "\n// ", -1)
 
 	return text
 }
@@ -120,9 +112,6 @@ func (d *Database) KeyDescription(tableName, columnName, keyName string) string 
 	text = strings.ReplaceAll(text, ": ", " ")
 	space := regexp.MustCompile(`\s+`)
 	text = space.ReplaceAllString(text, " ")
-	wrapper := wordwrap.Wrapper(77, false)
-	text = wrapper(text)
-	text = strings.Replace(text, "\n", "\n// ", -1)
 
 	return text
 }

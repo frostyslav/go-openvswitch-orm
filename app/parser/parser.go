@@ -31,10 +31,6 @@ const (
 )
 
 var (
-	customTypes = map[string]string{}
-)
-
-var (
 	typeMatching = map[string]string{
 		stringType: "string",
 		intType:    "int",
@@ -43,9 +39,18 @@ var (
 )
 
 type parser struct {
-	DBSchema  map[string]interface{}
-	XMLDoc    *xmlschema.Database
-	RawXMLDoc *xmlschema.Database
+	DBSchema    map[string]interface{}
+	XMLDoc      *xmlschema.Database
+	RawXMLDoc   *xmlschema.Database
+	structures  map[string]string
+	customTypes map[string]string
+}
+
+type info struct {
+	dbTableName  string
+	dbColumnName string
+	structName   string
+	fieldName    string
 }
 
 func New(jsonSchemaFile, xmlDocFile string) (*parser, error) {
@@ -73,55 +78,50 @@ func New(jsonSchemaFile, xmlDocFile string) (*parser, error) {
 	return &parser{DBSchema: dbSchema, XMLDoc: xmlDoc, RawXMLDoc: rawXMLDoc}, nil
 }
 
-func (p *parser) Parse() (map[string]string, map[string]string) {
+func (p *parser) Parse() {
 	rawTables := p.DBSchema[tablesKey].(map[string]interface{})
-	tables := make(map[string]string, len(rawTables))
+	p.structures = make(map[string]string, len(rawTables))
+	p.customTypes = make(map[string]string)
+	i := &info{}
 
 	for rawTableName, data := range rawTables {
+		i.dbTableName = rawTableName
+		i.structName = sanitizeName(i.dbTableName)
 		var str strings.Builder
 
-		tableName := sanitizeName(rawTableName)
-
-		str.WriteString(p.addTableComment(rawTableName))
-		str.WriteString(fmt.Sprintf("type %s struct {\n", tableName))
+		str.WriteString(p.addStructComment(i))
+		str.WriteString(fmt.Sprintf("type %s struct {\n", i.structName))
 
 		table, ok := data.(map[string]interface{})
 		if !ok {
-			log.Warnf("Can't parse table %q", rawTableName)
+			log.Warnf("Can't parse table %q", i.dbTableName)
 			continue
 		}
 
 		columns, ok := table[columnsKey].(map[string]interface{})
 		if !ok {
-			log.Warnf("Can't parse columns in table %q", rawTableName)
+			log.Warnf("Can't parse columns in table %q", i.dbTableName)
 			continue
 		}
 
 		for rawColumnName, data := range columns {
-			columnName := sanitizeName(rawColumnName)
-			str.WriteString(p.addColumnComment(rawTableName, rawColumnName))
-			str.WriteString(fmt.Sprintf("%s ", columnName))
-
-			col := column{tableName: rawTableName, name: rawColumnName, rawData: data, xmlDoc: p.RawXMLDoc}
-			str.WriteString(fmt.Sprintf("%s", col.parse()))
+			i.dbColumnName = rawColumnName
+			i.fieldName = sanitizeName(i.dbColumnName)
+			str.WriteString(p.addFieldComment(i))
+			str.WriteString(fmt.Sprintf("%s ", i.fieldName))
+			str.WriteString(fmt.Sprintf("%s", p.parseColumn(i, data)))
 		}
 		str.WriteString("}\n")
-		tables[tableName] = str.String()
+		p.structures[i.structName] = str.String()
 	}
-
-	return tables, customTypes
 }
 
-func (p *parser) addTableComment(rawTableName string) string {
-	tableName := sanitizeName(rawTableName)
-
-	return fmt.Sprintf("// %s %s\n", tableName, p.XMLDoc.TableDescription(rawTableName))
+func (p *parser) Structures() map[string]string {
+	return p.structures
 }
 
-func (p *parser) addColumnComment(rawTableName, rawColumnName string) string {
-	columnName := sanitizeName(rawColumnName)
-
-	return fmt.Sprintf("// %s %s\n", columnName, p.XMLDoc.ColumnDescription(rawTableName, rawColumnName))
+func (p *parser) CustomTypes() map[string]string {
+	return p.customTypes
 }
 
 func minValue(data map[string]interface{}) int64 {
